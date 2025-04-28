@@ -1,0 +1,87 @@
+stages:
+  - test
+  - validation
+  - benchmark
+  - deploy
+
+variables:
+  PYTHON_VERSION: "3.11"
+  DOCKER_TLS_CERTDIR: "/certs"
+
+# Default settings for all jobs
+default:
+  image: python:${PYTHON_VERSION}-slim
+  before_script:
+    - python -m pip install --upgrade pip
+    - pip install -r requirements.txt
+
+# Testing stage
+unit-tests:
+  stage: test
+  script:
+    - pytest app/tests --ignore=app/tests/validation --ignore=app/tests/benchmark
+  variables:
+    OPENAI_API_KEY: ${OPENAI_API_KEY}
+
+# Validation stage
+vector-db-validation:
+  stage: validation
+  needs: 
+    - unit-tests
+  script:
+    - python -c "from app.services.vector_store import create_vector_store; create_vector_store()"
+  variables:
+    OPENAI_API_KEY: ${OPENAI_API_KEY}
+
+prompt-validation:
+  stage: validation
+  needs:
+    - unit-tests
+  script:
+    - python -m app.tests.validation.test_prompt_templates
+  variables:
+    OPENAI_API_KEY: ${OPENAI_API_KEY}
+
+langgraph-validation:
+  stage: validation
+  needs:
+    - unit-tests
+  script:
+    - python -m app.tests.validation.validate_langgraph
+  variables:
+    OPENAI_API_KEY: ${OPENAI_API_KEY}
+
+# Benchmark stage
+performance-benchmark:
+  stage: benchmark
+  needs:
+    - vector-db-validation
+    - prompt-validation
+    - langgraph-validation
+  script:
+    - python -m app.tests.benchmark.performance_benchmark
+  variables:
+    OPENAI_API_KEY: ${OPENAI_API_KEY}
+  only:
+    - main
+
+# Deploy stage
+build-and-deploy:
+  stage: deploy
+  image: docker:23.0.1
+  services:
+    - docker:23.0.1-dind
+  variables:
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    AWS_DEFAULT_REGION: "us-east-1"
+    ECR_REPOSITORY: healthcare-compliance-rag
+  before_script:
+    - apk add --no-cache aws-cli
+    - aws ecr get-login-password | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+  script:
+    - docker build -t ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPOSITORY}:${CI_COMMIT_SHA} .
+    - docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPOSITORY}:${CI_COMMIT_SHA}
+    - aws ecs update-service --cluster healthcare-compliance-cluster --service healthcare-compliance-service --force-new-deployment
+  only:
+    - main 
