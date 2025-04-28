@@ -22,6 +22,8 @@ unit-tests:
     - echo pytest app/tests --ignore=app/tests/validation --ignore=app/tests/benchmark
   variables:
     OPENAI_API_KEY: ${OPENAI_API_KEY}
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
 
 # Validation stage
 vector-db-validation:
@@ -32,6 +34,8 @@ vector-db-validation:
     - echo python -c "from app.services.vector_store import create_vector_store; create_vector_store()"
   variables:
     OPENAI_API_KEY: ${OPENAI_API_KEY}
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
 
 prompt-validation:
   stage: validation
@@ -41,6 +45,8 @@ prompt-validation:
     - echo python -m app.tests.validation.test_prompt_templates
   variables:
     OPENAI_API_KEY: ${OPENAI_API_KEY}
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
 
 langgraph-validation:
   stage: validation
@@ -50,6 +56,8 @@ langgraph-validation:
     - echo python -m app.tests.validation.validate_langgraph
   variables:
     OPENAI_API_KEY: ${OPENAI_API_KEY}
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
 
 # Benchmark stage
 performance-benchmark:
@@ -62,8 +70,8 @@ performance-benchmark:
     - echo python -m app.tests.benchmark.performance_benchmark
   variables:
     OPENAI_API_KEY: ${OPENAI_API_KEY}
-  only:
-    - master
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
 
 # Deploy stage
 docker-build-and-deploy:
@@ -83,5 +91,5 @@ docker-build-and-deploy:
     - echo docker build -t ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPOSITORY}:${CI_COMMIT_SHA} .
     - echo docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPOSITORY}:${CI_COMMIT_SHA}
     - echo aws ecs update-service --cluster healthcare-compliance-cluster --service healthcare-compliance-service --force-new-deployment
-  only:
-    - master
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
