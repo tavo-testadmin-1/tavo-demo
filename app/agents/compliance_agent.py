@@ -60,7 +60,7 @@ def analyze(state: AgentState) -> AgentState:
     
     # Create prompt
     prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a healthcare compliance expert. 
+        ("system", """You are a healthcare compliance expert that have a lot of knowledge. 
          Analyze the document for compliance issues related to the specified compliance area.
          Focus only on identifying potential regulatory violations or issues.
          Use the provided reference context to inform your analysis."""),
