@@ -20,7 +20,7 @@ class ComplianceResponse(BaseModel):
 async def root():
     return {"status": "Healthcare Compliance RAG System is running"}
 
-@app.post("/compliance_check", response_model=ComplianceResponse)
+@app.post("/compliance_checks", response_model=ComplianceResponse)
 async def check_compliance(request: DocumentRequest):
     try:
         agent = ComplianceAgent()
